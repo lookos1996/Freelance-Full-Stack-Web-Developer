@@ -1,0 +1,455 @@
+<!DOCTYPE html>
+<html lang="el">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Σύστημα Παραδόσεων</title>
+    <style>
+        * { box-sizing: border-box; font-family: 'Segoe UI', Roboto, sans-serif; }
+        body { background-color: #f0f2f5; margin: 0; padding: 20px; display: flex; flex-direction: column; align-items: center; }
+        
+        .nav-menu { display: flex; gap: 10px; margin-bottom: 30px; background: white; padding: 10px; border-radius: 12px; box-shadow: 0 2px 10px rgba(0,0,0,0.05); }
+        .nav-btn { padding: 12px 24px; border: none; background: transparent; font-size: 16px; font-weight: bold; color: #4a5568; cursor: pointer; border-radius: 8px; transition: 0.2s; }
+        .nav-btn.active { background: #4299e1; color: white; }
+        .nav-btn:hover:not(.active) { background: #edf2f7; }
+
+        .page { display: none; width: 100%; max-width: 1400px; }
+        .page.active { display: block; }
+
+        .form-wrapper { background: white; padding: 30px; border-radius: 12px; box-shadow: 0 4px 20px rgba(0,0,0,0.05); max-width: 700px; margin: 0 auto; }
+        .input-group { margin-bottom: 15px; }
+        .input-group label { display: block; font-size: 13px; font-weight: 600; margin-bottom: 5px; color: #4a5568; }
+        .input-group input, .input-group select { width: 100%; padding: 12px; border: 1px solid #e2e8f0; border-radius: 8px; font-size: 15px; }
+        
+        .add-product-btn { padding: 12px 15px; background: #edf2f7; border: 1px solid #e2e8f0; border-radius: 8px; cursor: pointer; font-weight: bold; }
+        button.submit-btn { width: 100%; padding: 14px; background: #48bb78; color: white; border: none; border-radius: 8px; font-weight: bold; cursor: pointer; margin-top: 10px; }
+        
+        .tags-container { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
+        .product-tag { background: #ebf8ff; color: #2b6cb0; padding: 6px 12px; border-radius: 20px; font-size: 13px; font-weight: 600; display: flex; align-items: center; gap: 6px; border: 1px solid #bee3f8; }
+        .remove-tag { cursor: pointer; color: #e53e3e; font-weight: bold; border: none; background: none; font-size: 14px; padding: 0; }
+
+        .table-wrapper { background: white; border-radius: 12px; overflow: auto; box-shadow: 0 4px 20px rgba(0,0,0,0.05); margin-bottom: 20px; }
+        table { width: 100%; border-collapse: collapse; text-align: left; }
+        th { background: #f7fafc; padding: 12px; font-size: 13px; cursor: pointer; user-select: none; }
+        th:hover { background: #edf2f7; }
+        td { padding: 12px; border-top: 1px solid #edf2f7; vertical-align: middle; font-size: 14px; }
+        
+        .overdue-row { background-color: #fff0f0 !important; }
+        .overdue-row td { border-top-color: #ffd6d6; }
+
+        .inline-input { width: 100%; padding: 6px; border: 1px solid #cbd5e0; border-radius: 5px; font-size: 13px; font-family: inherit; }
+        
+        .alert-badge { padding: 5px 10px; border-radius: 15px; font-size: 12px; font-weight: bold; display: inline-block; white-space: nowrap; }
+        .alert-critical { background: #fed7d7; color: #e53e3e; }
+        .alert-red { background: #feebc8; color: #dd6b20; }
+        .alert-normal { background: #e2e8f0; color: #4a5568; }
+
+        .action-btn { padding: 6px 10px; border: none; border-radius: 5px; cursor: pointer; font-weight: bold; font-size: 12px; margin-right: 5px; }
+        .edit-btn { background: #bee3f8; color: #2b6cb0; }
+        .delete-btn { background: #fed7d7; color: #e53e3e; }
+        .save-btn { background: #48bb78; color: white; width: 100%; margin-bottom: 4px; }
+        .cancel-btn { background: #e2e8f0; color: #4a5568; width: 100%; }
+        .renew-btn { background: #4299e1; color: white; margin-top: 5px; width: 100%; font-size: 11px; padding: 6px; border-radius: 5px; cursor: pointer; border: none; font-weight: bold; }
+        .renew-btn:hover { background: #3182ce; }
+        
+        .inventory-month-box { background: white; padding: 20px; border-radius: 12px; margin-bottom: 20px; box-shadow: 0 2px 10px rgba(0,0,0,0.05); }
+        .inventory-list { list-style: none; padding: 0; margin: 0; }
+        .inventory-list li { display: flex; justify-content: space-between; padding: 10px 0; border-bottom: 1px solid #f7fafc; }
+    </style>
+</head>
+<body>
+
+    <div class="nav-menu">
+        <button class="nav-btn active" onclick="switchTab('add')">1. Νέα Καταχώρηση</button>
+        <button class="nav-btn" onclick="switchTab('list'); loadCustomers();">2. Λίστα Παραδόσεων</button>
+        <button class="nav-btn" onclick="switchTab('inventory'); renderInventory();">3. Αποθήκη / Σύνολα</button>
+    </div>
+
+    <!-- ΣΕΛΙΔΑ 1: ΦΟΡΜΑ -->
+    <div id="page-add" class="page active">
+        <div class="form-wrapper">
+            <h2 style="margin-top:0;">Νέος Πελάτης</h2>
+            <form id="customerForm">
+                <div class="input-group">
+                    <label>Ονοματεπώνυμο Πελάτη</label>
+                    <input type="text" id="ownerName" required>
+                </div>
+                
+                <div style="display: flex; gap: 10px;">
+                    <div class="input-group" style="flex: 1;">
+                        <label>Τηλέφωνο Επικοινωνίας</label>
+                        <input type="text" id="phone" required>
+                    </div>
+                    <div class="input-group" style="flex: 2;">
+                        <label>Διεύθυνση Παράδοσης</label>
+                        <input type="text" id="address" required>
+                    </div>
+                </div>
+
+                <div style="display: flex; gap: 10px;">
+                    <div class="input-group" style="flex: 1;">
+                        <label>Είδος</label>
+                        <select id="petType">
+                            <option value="Σκύλος">Σκύλος 🐶</option>
+                            <option value="Γάτα">Γάτα 🐱</option>
+                        </select>
+                    </div>
+                    <div class="input-group" style="flex: 2;">
+                        <label>Όνομα Κατοικιδίου</label>
+                        <input type="text" id="petName" required>
+                    </div>
+                </div>
+                
+                <div class="input-group">
+                    <label>Box (Εισαγωγή χειροκίνητα)</label>
+                    <div style="display: flex; gap: 8px;">
+                        <input type="text" id="productInput" placeholder="Πληκτρολογήστε προϊόν και πατήστε Προσθήκη ή Enter..." style="flex: 1;">
+                        <button type="button" class="add-product-btn" onclick="addProduct()">Προσθήκη</button>
+                    </div>
+                    <div id="selectedProductsContainer" class="tags-container"></div>
+                </div>
+
+                <div style="display: flex; gap: 10px;">
+                    <div class="input-group" style="flex: 1;">
+                        <label>Τιμή Box (€)</label>
+                        <input type="number" step="0.1" id="boxPrice" placeholder="π.χ. 45.50" required>
+                    </div>
+                    <div class="input-group" style="flex: 1;">
+                        <label>Επόμενη Παραγγελία (Σε πόσες ημέρες;)</label>
+                        <input type="number" id="deliveryInterval" placeholder="π.χ. 30" required>
+                    </div>
+                </div>
+
+                <button type="submit" class="submit-btn">Αποθήκευση στο σύστημα</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- ΣΕΛΙΔΑ 2: ΛΙΣΤΑ -->
+    <div id="page-list" class="page">
+        <div class="table-wrapper">
+            <table>
+                <thead>
+                    <tr>
+                        <th onclick="sortTable('ownerName')">Πελάτης ↕️</th>
+                        <th>Τηλ & Διεύθυνση</th>
+                        <th onclick="sortTable('petType')">Είδος ↕️</th>
+                        <th>Κατοικίδιο</th>
+                        <th>Box</th>
+                        <th>Τιμή (€)</th>
+                        <th onclick="sortTable('deliveryDate')">Παράδοση ↕️</th>
+                        <th onclick="sortTable('deliveryDate')">Κατάσταση ↕️</th>
+                        <th>Ενέργειες</th>
+                    </tr>
+                </thead>
+                <tbody id="customersTableBody"></tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- ΣΕΛΙΔΑ 3: ΑΠΟΘΗΚΗ -->
+    <div id="page-inventory" class="page">
+        <div id="inventoryContainer"></div>
+    </div>
+
+    <script>
+        let currentCustomers = [];
+        let currentSort = { column: 'deliveryDate', order: 'asc' };
+        let boxItems = [];
+        let editingRowId = null; 
+
+        function switchTab(tabId) {
+            document.querySelectorAll('.page').forEach(page => page.classList.remove('active'));
+            document.querySelectorAll('.nav-btn').forEach(btn => btn.classList.remove('active'));
+            document.getElementById('page-' + tabId).classList.add('active');
+            
+            const buttons = document.querySelectorAll('.nav-btn');
+            if(tabId === 'add') buttons[0].classList.add('active');
+            if(tabId === 'list') buttons[1].classList.add('active');
+            if(tabId === 'inventory') buttons[2].classList.add('active');
+        }
+
+        function addProduct() {
+            const input = document.getElementById('productInput');
+            const val = input.value.trim();
+            if (val !== "" && !boxItems.includes(val)) {
+                boxItems.push(val);
+                renderBoxItems();
+                input.value = '';
+            }
+            input.focus();
+        }
+
+        document.getElementById('productInput').addEventListener('keypress', function (e) {
+            if (e.key === 'Enter') { e.preventDefault(); addProduct(); }
+        });
+
+        function removeProduct(index) {
+            boxItems.splice(index, 1);
+            renderBoxItems();
+        }
+
+        function renderBoxItems() {
+            const container = document.getElementById('selectedProductsContainer');
+            container.innerHTML = '';
+            boxItems.forEach((item, index) => {
+                container.innerHTML += `
+                    <div class="product-tag">${item} <button type="button" class="remove-tag" onclick="removeProduct(${index})">×</button></div>`;
+            });
+        }
+
+        document.getElementById('customerForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            if (boxItems.length === 0) {
+                alert('Παρακαλώ προσθέστε τουλάχιστον ένα προϊόν.');
+                return;
+            }
+
+            const intervalDays = parseInt(document.getElementById('deliveryInterval').value);
+            const nextDate = new Date();
+            nextDate.setDate(nextDate.getDate() + intervalDays);
+            
+            const yyyy = nextDate.getFullYear();
+            const mm = String(nextDate.getMonth() + 1).padStart(2, '0');
+            const dd = String(nextDate.getDate()).padStart(2, '0');
+            const formattedDate = `${yyyy}-${mm}-${dd}`;
+
+            const customerData = {
+                ownerName: document.getElementById('ownerName').value,
+                petType: document.getElementById('petType').value,
+                petName: document.getElementById('petName').value,
+                phone: document.getElementById('phone').value,
+                address: document.getElementById('address').value,
+                boxContent: boxItems.join(' + '),
+                boxPrice: document.getElementById('boxPrice').value,
+                deliveryInterval: intervalDays,
+                deliveryDate: formattedDate
+            };
+
+            const response = await fetch('/api/customers', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(customerData)
+            });
+
+            if (response.ok) {
+                document.getElementById('customerForm').reset();
+                boxItems = [];
+                renderBoxItems();
+                alert('Επιτυχής Καταχώρηση!');
+            }
+        });
+
+        async function loadCustomers() {
+            const response = await fetch('/api/customers');
+            currentCustomers = await response.json();
+            sortTable(currentSort.column, true); 
+        }
+
+        function sortTable(column, keepOrder = false) {
+            if (!keepOrder) {
+                if (currentSort.column === column) {
+                    currentSort.order = currentSort.order === 'asc' ? 'desc' : 'asc';
+                } else {
+                    currentSort.column = column;
+                    currentSort.order = 'asc';
+                }
+            }
+
+            currentCustomers.sort((a, b) => {
+                let valA = a[column].toLowerCase();
+                let valB = b[column].toLowerCase();
+                if (valA < valB) return currentSort.order === 'asc' ? -1 : 1;
+                if (valA > valB) return currentSort.order === 'asc' ? 1 : -1;
+                return 0;
+            });
+            renderTable();
+        }
+
+        // --- Η ΒΕΛΤΙΩΜΕΝΗ ΛΕΙΤΟΥΡΓΙΑ ΑΝΑΝΕΩΣΗΣ ---
+        function fastRenewDate(id) {
+            const intervalInput = document.getElementById(`edit_interval_${id}`);
+            const dateInput = document.getElementById(`edit_deliveryDate_${id}`);
+            
+            const intervalDays = parseInt(intervalInput.value) || 0;
+            
+            // Υπολογίζουμε με βάση το "Σήμερα"
+            const newDate = new Date(); 
+            newDate.setDate(newDate.getDate() + intervalDays); 
+            
+            // Το μετατρέπουμε σωστά στην τοπική μας ώρα
+            const yyyy = newDate.getFullYear();
+            const mm = String(newDate.getMonth() + 1).padStart(2, '0');
+            const dd = String(newDate.getDate()).padStart(2, '0');
+            const calculatedDate = `${yyyy}-${mm}-${dd}`;
+
+            // Ελέγχουμε αν η ημερομηνία αλλάζει οπτικά ή είναι ίδια
+            if (dateInput.value === calculatedDate) {
+                // Είναι ΗΔΗ η σωστή! (Κίτρινο εφέ για να το καταλάβεις)
+                dateInput.style.transition = "background-color 0.3s";
+                dateInput.style.backgroundColor = "#fefcbf"; 
+                setTimeout(() => { dateInput.style.backgroundColor = "white"; }, 600);
+            } else {
+                // Η ημερομηνία άλλαξε! (Πράσινο εφέ επιτυχίας)
+                dateInput.value = calculatedDate; 
+                dateInput.style.transition = "background-color 0.3s";
+                dateInput.style.backgroundColor = "#c6f6d5"; 
+                setTimeout(() => { dateInput.style.backgroundColor = "white"; }, 600);
+            }
+        }
+
+        function renderTable() {
+            const tbody = document.getElementById('customersTableBody');
+            tbody.innerHTML = '';
+            const today = new Date();
+            today.setHours(0, 0, 0, 0);
+
+            currentCustomers.forEach(cust => {
+                const tr = document.createElement('tr');
+                const deliveryDate = new Date(cust.deliveryDate);
+                deliveryDate.setHours(0, 0, 0, 0); 
+                
+                const diffDays = Math.ceil((deliveryDate - today) / (1000 * 60 * 60 * 24));
+                let alertText = "", alertClass = "";
+                let isOverdue = false; 
+
+                if (diffDays < 0) { alertText = "ΚΑΘΥΣΤΕΡΗΣΗ!"; alertClass = "alert-critical"; isOverdue = true; } 
+                else if (diffDays === 0) { alertText = "ΣΗΜΕΡΑ!"; alertClass = "alert-critical"; } 
+                else if (diffDays <= 2) { alertText = "Σε " + diffDays + " μέρες"; alertClass = "alert-red"; } 
+                else { alertText = "Σε " + diffDays + " μέρες"; alertClass = "alert-normal"; }
+
+                if (isOverdue) tr.classList.add('overdue-row');
+
+                if (editingRowId === cust.id) {
+                    tr.innerHTML = `
+                        <td><input type="text" id="edit_ownerName_${cust.id}" class="inline-input" value="${cust.ownerName}"></td>
+                        <td>
+                            <input type="text" id="edit_phone_${cust.id}" class="inline-input" value="${cust.phone}" placeholder="Τηλ." style="margin-bottom:4px;">
+                            <input type="text" id="edit_address_${cust.id}" class="inline-input" value="${cust.address}" placeholder="Διεύθυνση">
+                        </td>
+                        <td>
+                            <select id="edit_petType_${cust.id}" class="inline-input">
+                                <option value="Σκύλος" ${cust.petType === 'Σκύλος' ? 'selected' : ''}>Σκύλος</option>
+                                <option value="Γάτα" ${cust.petType === 'Γάτα' ? 'selected' : ''}>Γάτα</option>
+                            </select>
+                        </td>
+                        <td><input type="text" id="edit_petName_${cust.id}" class="inline-input" value="${cust.petName}"></td>
+                        <td><input type="text" id="edit_boxContent_${cust.id}" class="inline-input" value="${cust.boxContent}"></td>
+                        <td><input type="number" step="0.1" id="edit_boxPrice_${cust.id}" class="inline-input" value="${cust.boxPrice}" style="width: 60px;"></td>
+                        <td>
+                            <input type="date" id="edit_deliveryDate_${cust.id}" class="inline-input" value="${cust.deliveryDate}" style="margin-bottom:5px;">
+                            <div style="display:flex; align-items:center; gap:4px;">
+                                <span style="font-size:11px; color:#4a5568;">Ανά</span>
+                                <input type="number" id="edit_interval_${cust.id}" class="inline-input" value="${cust.deliveryInterval}" style="width: 50px; padding: 4px;">
+                                <span style="font-size:11px; color:#4a5568;">μέρες</span>
+                            </div>
+                            <button type="button" class="renew-btn" onclick="fastRenewDate(${cust.id})">Ανανέωση βάσει ημερών</button>
+                        </td>
+                        <td><span class="alert-badge ${alertClass}">${alertText}</span></td>
+                        <td style="min-width:100px;">
+                            <button class="action-btn save-btn" onclick="saveInlineEdit(${cust.id})">✔️ Αποθήκευση</button>
+                            <button class="action-btn cancel-btn" onclick="cancelInlineEdit()">❌ Ακύρωση</button>
+                        </td>
+                    `;
+                } else {
+                    tr.innerHTML = `
+                        <td><strong>${cust.ownerName}</strong></td>
+                        <td>${cust.phone}<br><span style="font-size:12px; color:#718096;">${cust.address}</span></td>
+                        <td>${cust.petType}</td>
+                        <td>${cust.petName}</td>
+                        <td>${cust.boxContent.replace(/\+/g, '<br>+')}</td>
+                        <td><strong>${cust.boxPrice} €</strong></td>
+                        <td>
+                            <strong>${deliveryDate.toLocaleDateString('el-GR')}</strong><br>
+                            <span style="font-size:12px; color:#718096;">Ανά ${cust.deliveryInterval} μέρες</span>
+                        </td>
+                        <td><span class="alert-badge ${alertClass}">${alertText}</span></td>
+                        <td style="min-width:100px;">
+                            <button class="action-btn edit-btn" onclick="startInlineEdit(${cust.id})">Αλλαγή</button>
+                            <button class="action-btn delete-btn" onclick="deleteCustomer(${cust.id})">X</button>
+                        </td>
+                    `;
+                }
+                tbody.appendChild(tr);
+            });
+        }
+
+        function startInlineEdit(id) { editingRowId = id; renderTable(); }
+        function cancelInlineEdit() { editingRowId = null; renderTable(); }
+
+        async function saveInlineEdit(id) {
+            const customerData = {
+                ownerName: document.getElementById(`edit_ownerName_${id}`).value,
+                phone: document.getElementById(`edit_phone_${id}`).value,
+                address: document.getElementById(`edit_address_${id}`).value,
+                petType: document.getElementById(`edit_petType_${id}`).value,
+                petName: document.getElementById(`edit_petName_${id}`).value,
+                boxContent: document.getElementById(`edit_boxContent_${id}`).value,
+                boxPrice: document.getElementById(`edit_boxPrice_${id}`).value,
+                deliveryInterval: document.getElementById(`edit_interval_${id}`).value,
+                deliveryDate: document.getElementById(`edit_deliveryDate_${id}`).value
+            };
+
+            const response = await fetch(`/api/customers/${id}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(customerData)
+            });
+
+            if (response.ok) {
+                editingRowId = null; 
+                loadCustomers();     
+            }
+        }
+
+        async function deleteCustomer(id) {
+            if(confirm('Είστε σίγουροι ότι θέλετε να διαγράψετε αυτή την εγγραφή;')) {
+                await fetch(`/api/customers/${id}`, { method: 'DELETE' });
+                loadCustomers();
+            }
+        }
+
+        function renderInventory() {
+            const container = document.getElementById('inventoryContainer');
+            container.innerHTML = '';
+            
+            if(currentCustomers.length === 0) {
+                container.innerHTML = '<div class="form-wrapper"><p>Δεν υπάρχουν παραγγελίες.</p></div>';
+                return;
+            }
+
+            const inventory = {}; 
+
+            currentCustomers.forEach(cust => {
+                const date = new Date(cust.deliveryDate);
+                const monthYear = date.toLocaleString('el-GR', { month: 'long', year: 'numeric' });
+                
+                if (!inventory[monthYear]) inventory[monthYear] = {};
+                
+                const products = cust.boxContent.split(' + ');
+                products.forEach(p => {
+                    const cleanP = p.trim();
+                    if(inventory[monthYear][cleanP]) {
+                        inventory[monthYear][cleanP]++;
+                    } else {
+                        inventory[monthYear][cleanP] = 1;
+                    }
+                });
+            });
+
+            for (const [month, productsObj] of Object.entries(inventory)) {
+                let html = `<div class="inventory-month-box">
+                                <h3 style="margin-top:0;">📅 Παραγγελίες για ${month}</h3>
+                                <ul class="inventory-list">`;
+                
+                for (const [prodName, qty] of Object.entries(productsObj)) {
+                    html += `<li><span>📦 ${prodName}</span> <span class="qty-badge">${qty} τεμ.</span></li>`;
+                }
+                
+                html += `</ul></div>`;
+                container.innerHTML += html;
+            }
+        }
+    </script>
+</body>
+</html>
